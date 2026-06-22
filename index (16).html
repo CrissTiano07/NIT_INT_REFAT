@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://www.gstatic.com">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            window.NIT_API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+                ? 'http://127.0.0.1:8000'
+                : 'https://nit-backend-production-f09b.up.railway.app';
+            window._NIT_KEY_CACHE = null;
+
+            window.getNITKey = async function() {
+                if (window._NIT_KEY_CACHE) return window._NIT_KEY_CACHE;
+                try {
+                    const r = await fetch(`${window.NIT_API_URL}/api/v1/config`);
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    const d = await r.json();
+                    window._NIT_KEY_CACHE = d.key;
+                    return d.key;
+                } catch (e) {
+                    console.warn('[NIT] Erro ao buscar chave:', e.message);
+                    return null;
+                }
+            };
+
+            const firebaseConfig = {
+                apiKey:        "AIzaSyCWAGfmCr-pHr0asIk_Sfz1WbajIEhiZn0",
+                authDomain:    "nit-operacional.firebaseapp.com",
+                databaseURL:   "https://nit-operacional-default-rtdb.firebaseio.com/",
+                projectId:     "nit-operacional",
+                storageBucket: "nit-operacional.appspot.com",
+            };
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            window.db = firebase.database();
+        });
+    </script>
+
+    <title>NIT — Painel de Gestão Integrada v13.0</title>
+    <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="nit.css">
+
+</head>
+<body data-theme="dark">
+
+    <!-- LOGIN ────────────────────────────────────────────────────────── -->
+    <!-- Backdrop sidebar (mobile/tablet) -->
+    <div class="sb-backdrop" id="sb-backdrop"></div>
+
+    <div id="nit-login-overlay" class="nit-login-overlay">
+        <div class="nit-login-box">
+            <div class="nit-login-logo">NIT</div>
+            <div class="nit-login-sub">Núcleo de Inteligência de Tráfego</div>
+            <div class="nit-login-field">
+                <label for="login-nome">Nome do Operador</label>
+                <input id="login-nome" type="text" placeholder="Informe seu nome aqui" autocomplete="off" maxlength="40">
+            </div>
+            <div class="nit-login-field">
+                <label for="login-turno">Turno</label>
+                <select id="login-turno">
+                    <option value="">— Selecione —</option>
+                    <option value="MANHÃ">Manhã</option>
+                    <option value="TARDE">Tarde</option>
+                    <option value="NOITE">Noite</option>
+                </select>
+            </div>
+            <button id="btn-login-entrar" class="nit-login-btn" disabled>Entrar</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="tab-navigation">
+            <div class="nav-pill">
+                <div class="nav-left">
+                    <button class="btn-sb-hamburger" id="btn-sb-hamburger" title="Abrir painel lateral" aria-label="Abrir painel lateral">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <button class="tab-button active" data-tab="tab-semaforo"> Semáforo</button>
+                </div>
+                <div class="nav-pill-center">
+                    <button id="btn-busca-global" title="Busca global (Ctrl+K)" aria-label="Abrir busca global">
+                        
+                        <span>Pesquisar cards…</span>
+                        <kbd>Ctrl K</kbd>
+                    </button>
+                </div>
+                <div class="nav-right">
+                    <span id="nit-operador-badge" class="nav-operador-badge"></span>
+                    <span id="nit-firebase-status" class="nit-status-indicator" title="Status Firebase">
+                        <span class="nit-status-dot" style="background-color:var(--color-info);"></span>
+                        <span style="color:var(--color-info);">Conectando…</span>
+                    </span>
+                    <button id="btn-ver-historico" class="btn-icon" title="Ver Histórico de Ações" style="width:26px;height:26px;font-size:12px;"><i class="fas fa-history"></i></button>
+                    <button id="btn-logout" title="Sair / Trocar operador">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Sair</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB SEMÁFORO ──────────────────────────────────────────────── -->
+        <div id="tab-semaforo" class="tab-content active">
+            <div class="app-layout">
+
+                <!-- SIDEBAR ─────────────────────────────────────────── -->
+                <aside class="sidebar" id="sidebar">
+                    <button class="sb-toggle" id="btn-sb-toggle" title="Recolher / Expandir painel" aria-expanded="true">
+                        
+                    </button>
+
+                    <div class="sb-section" id="sb-sec-entrada" style="border-bottom:1px solid var(--color-border);">
+                        <div class="sb-body" style="max-height:none;">
+                            <div class="sb-inner sb-inner-circulo">
+
+                                <!-- Wrapper do círculo — some via CSS quando .collapsed -->
+                                <div class="sb-circulo-wrap">
+                                    <div class="sb-ring-outer">
+                                        <div class="sb-ring-inner">
+                                            <div class="sb-circulo">
+                                                <textarea
+                                                    id="relatorio-bruto-input"
+                                                    class="sb-textarea-circulo"
+                                                    placeholder=""
+                                                ></textarea>
+                                                <!-- Placeholder visual do círculo — controlado por JS -->
+                                                <div id="circulo-placeholder-label" style="
+                                                    position:absolute;inset:0;display:flex;
+                                                    flex-direction:column;align-items:center;
+                                                    justify-content:center;pointer-events:none;
+                                                    color:rgba(250,250,250,0.70);font-size:11px;
+                                                    font-family:var(--font-family-mono);
+                                                    text-align:center;padding:0 20px;
+                                                    line-height:1.5;transition:opacity .2s;
+                                                ">
+                                                    <i class="fas fa-paste" style="font-size:18px;margin-bottom:6px;opacity:.12;"></i>
+                                                    Cole o relatório aqui…
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Botão processar — estilo 100% via classe CSS -->
+                                <button
+                                    type="button"
+                                    id="btn-processar"
+                                    class="sb-btn-processar-full"
+                                >
+                                    <span class="sb-label">Processar</span>
+                                </button>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sb-section" id="sb-sec-saida">
+                        <div class="sb-section-header" onclick="NitSidebar.toggleSec('sb-sec-saida')" role="button" tabindex="0">
+                            <div class="sb-icon"></div>
+                            <span class="sb-label">Saída</span>
+                            
+                        </div>
+                        <div class="sb-body">
+                            <div class="sb-inner">
+                                <div class="balanco-compacto">
+                                    <div class="balanco-item">
+                                        <span>Ocorrências</span>
+                                        <strong id="display-total">0</strong>
+                                    </div>
+                                    <div class="balanco-item" style="--balanco-cor: var(--color-success)">
+                                        <span>Normalizados</span>
+                                        <strong id="display-normalizados">0</strong>
+                                    </div>
+                                    <div class="balanco-item" style="--balanco-cor: var(--color-warning)">
+                                        <span>Pendentes</span>
+                                        <strong id="display-pendentes">0</strong>
+                                    </div>
+                                </div>
+                                <textarea id="relatorio-final-preview" class="mono-font sb-textarea" readonly placeholder="Pré-visualização do relatório..."></textarea>
+                                <div class="form-check">
+                                    <input type="checkbox" id="check-incluir-normalizados">
+                                    <label for="check-incluir-normalizados">Incluir Normalizados</label>
+                                </div>
+                                <button id="btn-visualizar-relatorio" class="btn btn-primario sb-btn"><span class="sb-btn-label">Ver Relatório</span></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sb-collapsed-icons">
+                        <div title="Entrada de Dados" onclick="NitSidebar.expandir()"></div>
+                        <div title="Processar relatorio" id="btn-processar-collapsed" class="sb-collapsed-processar" onclick="document.getElementById('btn-processar').click()"></div>
+                        <div title="Saída" onclick="NitSidebar.expandir()"></div>
+                    </div>
+                </aside>
+
+                <!-- KANBAN AREA ──────────────────────────────────────── -->
+                <div class="kanban-area">
+                    <div class="painel-operacional-wrapper">
+                        <div id="kanban-wrapper">
+                            <div class="kanban-board">
+                                <div class="kanban-column" id="coluna-espera">
+                                    <div class="kanban-column-header">
+                                        <span class="header-text cor-atendimento">AGUARDANDO</span>
+                                        <span class="card-count" id="count-espera">0</span>
+                                    </div>
+                                    <div class="kanban-column-filter">
+                                        <input type="text" class="kanban-search" data-coluna="coluna-espera" placeholder="Buscar nesta coluna">
+                                    </div>
+                                    <div class="kanban-cards-container"></div>
+                                </div>
+                                <div class="kanban-column" id="coluna-vl">
+                                    <div class="kanban-column-header">
+                                        <span class="header-text cor-via-livre">VIA LIVRE</span>
+                                        <span class="card-count" id="count-vl">0</span>
+                                    </div>
+                                    <div class="kanban-column-filter">
+                                        <input type="text" class="kanban-search" data-coluna="coluna-vl" placeholder="Buscar nesta coluna">
+                                    </div>
+                                    <div class="kanban-cards-container"></div>
+                                </div>
+                                <div class="kanban-column" id="coluna-amc">
+                                    <div class="kanban-column-header">
+                                        <span class="header-text cor-amc">AMC</span>
+                                        <span class="card-count" id="count-amc">0</span>
+                                    </div>
+                                    <div class="kanban-column-filter">
+                                        <input type="text" class="kanban-search" data-coluna="coluna-amc" placeholder="Buscar nesta coluna">
+                                    </div>
+                                    <div class="kanban-cards-container"></div>
+                                </div>
+                                <div class="kanban-column" id="coluna-sem-necessidade">
+                                    <div class="kanban-column-header">
+                                        <span class="header-text cor-sem-necessidade">SEM NECESSIDADE</span>
+                                        <span class="card-count" id="count-sem-necessidade">0</span>
+                                    </div>
+                                    <div class="kanban-column-filter">
+                                        <input type="text" class="kanban-search" data-coluna="coluna-sem-necessidade" placeholder="Buscar nesta coluna">
+                                    </div>
+                                    <div class="kanban-cards-container"></div>
+                                </div>
+                                <div class="kanban-column" id="coluna-normalizados">
+                                    <div class="kanban-column-header">
+                                        <button id="btn-toggle-norm" onclick="NitNormalizados.toggle()" title="Recolher coluna"></button>
+                                        <div class="norm-collapsed-group">
+                                            <span class="header-text cor-normalizado">NORMALIZADOS</span>
+                                            <span class="card-count" id="count-normalizados">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="kanban-column-filter">
+                                        <input type="text" class="kanban-search" data-coluna="coluna-normalizados" placeholder="Buscar nesta coluna">
+                                    </div>
+                                    <div class="kanban-cards-container"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- DATALISTS ──────────────────────────────────────────────────────── -->
+    <datalist id="lista-operadores-datalist"></datalist>
+    <datalist id="lista-supervisores"></datalist>
+    <datalist id="lista-monitores"></datalist>
+    <datalist id="lista-locais-datalist"></datalist>
+    <datalist id="lista-qrus-datalist"></datalist>
+    <datalist id="lista-turnos">
+        <option value="MANHÃ"></option>
+        <option value="TARDE"></option>
+        <option value="NOITE"></option>
+    </datalist>
+
+    <!-- MODAIS ─────────────────────────────────────────────────────────── -->
+    <div id="modal-relatorio" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">Relatório Semafórico</div>
+            <div class="modal-body">
+                <textarea id="modal-relatorio-texto" class="mono-font" readonly rows="15"
+                    style="width:100%;border:none;resize:none;background:var(--color-bg);color:var(--color-text-primary);font-size:13px;line-height:1.6;padding:8px;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-modal-copiar" class="btn btn-primario">Copiar</button>
+                <button id="btn-modal-fechar" class="btn btn-secundario">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-despacho-semaforo" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-container">
+            <div class="modal-header">Despachar Equipe de Operação</div>
+            <div class="modal-body">
+                <input type="hidden" id="despacho-semaforo-card-id">
+                <div class="form-group">
+                    <label for="despacho-semaforo-equipe">Equipe / Representante:</label>
+                    <input type="text" id="despacho-semaforo-equipe" placeholder="Nome do responsável" list="lista-operadores-datalist">
+                </div>
+                <div class="form-group">
+                    <label for="despacho-semaforo-vt">Viatura (VT):</label>
+                    <input type="text" id="despacho-semaforo-vt" placeholder="Número da viatura (opcional)">
+                </div>
+                <div class="form-group" id="grupo-apoio" style="border-top:1px solid var(--color-border);padding-top:12px;margin-top:4px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="despacho-tem-apoio" style="accent-color:var(--color-primary);">
+                        <span>+ Adicionar equipe de apoio</span>
+                    </label>
+                    <div id="grupo-apoio-campos" style="display:none;margin-top:10px;flex-direction:column;gap:8px;">
+                        <input type="text" id="despacho-apoio-equipe" placeholder="Equipe de apoio" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:13px;font-family:var(--font-family-sans);">
+                        <input type="text" id="despacho-apoio-vt" placeholder="VT de apoio (opcional)" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:13px;font-family:var(--font-family-sans);">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de despacho:</label>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <button type="button" id="despacho-tipo-vl"
+                            style="flex:1;height:36px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-text-secondary);cursor:pointer;transition:all .15s;"
+                            onclick="Semaforo.selecionarTipoDespacho('vl')">🟠 Via Livre</button>
+                        <button type="button" id="despacho-tipo-amc"
+                            style="flex:1;height:36px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-text-secondary);cursor:pointer;transition:all .15s;"
+                            onclick="Semaforo.selecionarTipoDespacho('amc')">🔵 AMC</button>
+                    </div>
+                    <input type="hidden" id="despacho-semaforo-tipo" value="vl">
+                </div>
+                <div class="form-group">
+                    <label for="despacho-mover-coluna">Mover card para coluna:</label>
+                    <select id="despacho-mover-coluna" class="nit-select">
+                        <option value="">— manter na coluna atual —</option>
+                        <option value="coluna-espera">Aguardando Atendimento</option>
+                        <option value="coluna-vl">Via Livre</option>
+                        <option value="coluna-amc">AMC</option>
+                        <option value="coluna-sem-necessidade">Sem Necessidade</option>
+                    </select>
+                    <small style="color:var(--color-text-tertiary);font-size:11px;">Para usuários de teclado: selecione a coluna destino antes de confirmar.</small>
+                </div>
+                <div class="despacho-preview" id="despacho-preview" role="status">
+                    <div class="despacho-preview-title">Confirmar despacho</div>
+                    <div class="despacho-preview-grid">
+                        <div class="despacho-preview-item"><span class="despacho-preview-label">Código</span><span class="despacho-preview-value" id="dp-cod">—</span></div>
+                        <div class="despacho-preview-item"><span class="despacho-preview-label">Tipo</span><span class="despacho-preview-value" id="dp-tipo">—</span></div>
+                        <div class="despacho-preview-item" style="grid-column:1/-1;"><span class="despacho-preview-label">Cruzamento</span><span class="despacho-preview-value" id="dp-loc" style="font-size:12px;">—</span></div>
+                        <div class="despacho-preview-item"><span class="despacho-preview-label">Equipe</span><span class="despacho-preview-value" id="dp-eq">—</span></div>
+                        <div class="despacho-preview-item"><span class="despacho-preview-label">Viatura</span><span class="despacho-preview-value" id="dp-vt">—</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="btn-despacho-semaforo-confirmar" class="btn btn-primario" style="flex:2;min-width:120px;">Confirmar Despacho</button>
+                <button id="btn-encerrar-operacao" class="btn"
+                    style="flex:1;min-width:100px;background:rgba(239,68,68,0.12);color:var(--color-danger);border-color:rgba(239,68,68,0.25);display:none;">
+                    <i class="fas fa-stop-circle"></i> Encerrar Operação
+                </button>
+                <button id="btn-despacho-semaforo-cancelar" class="btn btn-secundario" style="flex:1;min-width:80px;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-edicao" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">Editar Ocorrência</div>
+            <div class="modal-body">
+                <input type="hidden" id="edicao-card-id">
+                <div class="form-group"><label>Código:</label><input type="text" id="edicao-codigo" readonly></div>
+                <div class="form-group"><label>Endereço:</label><input type="text" id="edicao-endereco"></div>
+                <div class="form-group">
+                    <label>Problema:</label>
+                    <select id="edicao-problema" class="nit-select">
+                        <option value="APAGADO">APAGADO</option>
+                        <option value="PISCANTE">PISCANTE</option>
+                        <option value="TRAVADO">TRAVADO</option>
+                        <option value="INTERMITENTE">INTERMITENTE</option>
+                        <option value="N/I">N/I</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-edicao-salvar" class="btn btn-primario">Salvar</button>
+                <button id="btn-edicao-cancelar" class="btn btn-secundario">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NORMALIZAR ───────────────────────────────────────────────────── -->
+    <div id="modal-normalizar" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-container" style="max-width:420px;">
+            <div class="modal-header" style="display:flex;align-items:center;gap:10px;">
+                <span style="color:var(--color-success);font-size:18px;">✅</span>
+                <span>Normalizar Ocorrência</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="norm-card-id">
+                <div style="background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:16px;">
+                    <div style="font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Ocorrência</div>
+                    <div id="norm-card-info" style="font-size:13px;font-weight:600;color:var(--color-text-primary);"></div>
+                </div>
+                <div class="form-group">
+                    <label for="norm-data-fim">Data de Normalização <span style="color:var(--color-danger)">*</span></label>
+                    <input type="date" id="norm-data-fim" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:14px;font-family:var(--font-family-sans);color-scheme:dark;">
+                </div>
+                <div class="form-group">
+                    <label for="norm-hora-fim">Hora de Normalização <span style="color:var(--color-danger)">*</span></label>
+                    <input type="time" id="norm-hora-fim" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:14px;font-family:var(--font-family-sans);color-scheme:dark;">
+                </div>
+                <div class="form-group">
+                    <label for="norm-obs">Observação</label>
+                    <textarea id="norm-obs" rows="3" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:13px;font-family:var(--font-family-sans);resize:none;"></textarea>
+                </div>
+                <div id="norm-erro" style="display:none;color:var(--color-danger);font-size:12px;margin-top:-8px;margin-bottom:8px;padding:8px 10px;background:rgba(239,68,68,0.08);border-radius:6px;border:1px solid rgba(239,68,68,0.2);"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-norm-confirmar" class="btn btn-primario" style="background:var(--color-success);border-color:var(--color-success);">
+                    <i class="fas fa-check"></i> Confirmar Normalização
+                </button>
+                <button id="btn-norm-cancelar" class="btn btn-secundario">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-historico" class="modal-overlay">
+        <div class="modal-container" style="max-width: 800px;">
+            <div class="modal-header">Histórico de Ações</div>
+            <div class="modal-body" id="historico-body" style="max-height: 70vh; overflow-y: auto;"></div>
+            <div class="modal-footer">
+                <button id="btn-historico-fechar" class="btn btn-secundario">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirmar-generico" class="modal-overlay">
+        <div class="modal-container" style="max-width:420px;">
+            <div class="modal-header" id="modal-confirmar-titulo" style="color:var(--color-danger);">Confirmar Ação</div>
+            <div class="modal-body" style="text-align:center; padding:24px 16px;">
+                <p id="modal-confirmar-msg" style="font-size:15px; line-height:1.6;"></p>
+            </div>
+            <div class="modal-footer" style="justify-content:center; gap:16px;">
+                <button id="btn-confirmar-generico-ok" class="btn"
+                    style="background:var(--color-danger);color:#fff;border-color:var(--color-danger);min-width:120px;">
+                    Confirmar
+                </button>
+                <button id="btn-confirmar-generico-cancel" class="btn btn-secundario" style="min-width:100px;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-detalhes" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-container" style="max-width:540px;">
+            <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Detalhes da Ocorrência</span>
+                <span id="detalhe-coluna-badge" class="detalhe-coluna-badge"></span>
+            </div>
+            <div class="modal-body">
+                <div class="detalhe-grid">
+                    <div class="detalhe-item"><span class="detalhe-label">Código</span><span class="detalhe-valor" id="det-codigo">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Problema</span><span class="detalhe-valor" id="det-problema">—</span></div>
+                    <div class="detalhe-item detalhe-full"><span class="detalhe-label">Endereço / Cruzamento</span><span class="detalhe-valor" id="det-endereco">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Início</span><span class="detalhe-valor" id="det-inicio">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Fim</span><span class="detalhe-valor" id="det-fim">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Reincidente</span><span class="detalhe-valor" id="det-reincidente">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Tipo</span><span class="detalhe-valor" id="det-tipo">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Equipe despachada</span><span class="detalhe-valor" id="det-equipe">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Viatura (VT)</span><span class="detalhe-valor" id="det-viatura">—</span></div>
+                    <div class="detalhe-item detalhe-full"><span class="detalhe-label">Observações</span><span class="detalhe-valor" id="det-obs" style="white-space:pre-wrap;min-height:50px;">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Data referência</span><span class="detalhe-valor" id="det-data">—</span></div>
+                    <div class="detalhe-item"><span class="detalhe-label">Operador</span><span class="detalhe-valor" id="det-operador">—</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-detalhes-fechar" class="btn btn-secundario">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BUSCA GLOBAL ───────────────────────────────────────────────────── -->
+    <div id="busca-global-overlay" role="dialog" aria-modal="true" aria-label="Busca global">
+        <div id="busca-global-panel">
+            <div id="busca-global-input-wrap">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;color:var(--color-text-secondary)"><path d="M10 6.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Zm-.618 3.09a4.5 4.5 0 1 1 .707-.707l2.914 2.913a.5.5 0 0 1-.707.708L9.382 9.59Z" fill="currentColor"/></svg>
+                <input type="search" id="busca-global-input" placeholder="Buscar por código, endereço ou problema…" autocomplete="off" spellcheck="false">
+                <button id="busca-global-esc" title="Fechar (Esc)">ESC</button>
+            </div>
+            <div id="busca-global-resultados"></div>
+            <div id="busca-global-vazio">Nenhum card encontrado.</div>
+        </div>
+    </div>
+
+    <!-- TOAST / UNDO ───────────────────────────────────────────────────── -->
+
+    <!-- MODAL VIRADA DE DIA ──────────────────────────────────────────────────── -->
+    <div id="modal-virada-dia" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-virada-titulo">
+        <div class="modal-container" style="max-width:480px;">
+            <div class="modal-header" id="modal-virada-titulo" style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:20px;">🌅</span>
+                <span>Verificação de Turno</span>
+            </div>
+            <div class="modal-body" style="padding:24px 20px;">
+                <div id="modal-virada-corpo"></div>
+            </div>
+            <div class="modal-footer" style="gap:10px;">
+                <button id="btn-virada-processar" class="btn btn-primario">
+                    <i class="fas fa-paste"></i> Processar relatório pendente
+                </button>
+                <button id="btn-virada-ok" class="btn btn-secundario">
+                    <i class="fas fa-check"></i> Já verifiquei
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <div id="undo-toast" class="undo-toast" role="status" aria-live="polite">
+        <div class="undo-toast-row">
+            <span class="undo-toast-msg" id="undo-toast-msg"></span>
+            <button class="undo-toast-btn" id="undo-toast-btn" onclick="window._nitUndoFn && window._nitUndoFn()">Desfazer</button>
+        </div>
+        <div class="undo-progress"><div class="undo-progress-bar" id="undo-progress-bar"></div></div>
+    </div>
+
+    <!-- APP LOGIC ──────────────────────────────────────────────────────── -->
+    
+    <script src="nit.js"></script>
+
+</body>
+</html>
