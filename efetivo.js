@@ -100,6 +100,11 @@ const NIT_EFETIVO = (() => {
 
       firebase.auth().onAuthStateChanged(async user => {
         if (user) {
+          if (user.isAnonymous && S.modo !== 'campo') {
+            await firebase.auth().signOut();
+            UI.showLogin();
+            return;
+          }
           S.user = user;
           await Auth._resolveRole(user);
           if (S.modo === 'campo' || !S.role || S.role === 'campo') {
