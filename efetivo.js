@@ -110,18 +110,21 @@ const NIT_EFETIVO = (() => {
             UI.showDashboard();
           }
         } else {
-          // Sem auth
-          if (S.modo === 'campo') {
-            await DB.initPublico();
-            UI.showCampo();
-          } else {
-            UI.showLogin();
-          }
-        }
+  // Sem auth
+    if (S.modo === 'campo') {
+      firebase.auth().signInAnonymously()
+        .catch(e => UI.toast('Erro de conexão. Tente novamente.', 'danger'));
+      // onAuthStateChanged re-dispara com o usuário anônimo
+      // e cuida de DB.initPublico() + UI.showCampo() a partir daí
+    } else {
+      UI.showLogin();
+    }
+  }
       });
     },
 
     async _resolveRole(user) {
+      if (!user.email) { S.role = 'campo'; return; }
       try {
         const snap = await firebase.database()
           .ref(`efetivo_roles/${emailKey(user.email)}`).get();
