@@ -456,6 +456,15 @@ input, select, button, textarea {
 .campo-op-nome {
   font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 12px;
 }
+.campo-op-nome-alerta {
+  color: var(--color-orange); font-weight: 600;
+}
+.campo-horario-alerta-nota {
+  font-size: 0.72rem; color: var(--color-orange);
+  background: var(--color-orange-dim);
+  border-left: 3px solid var(--color-orange);
+  padding: 6px 10px; margin-bottom: 12px; border-radius: 4px;
+}
 .campo-obs {
   font-size: 0.78rem; color: var(--color-text-tertiary);
   font-style: italic; margin-bottom: 12px;
@@ -497,6 +506,9 @@ input, select, button, textarea {
   color: var(--color-decorative); letter-spacing: 0.06em;
   text-align: center;
   border-top: 1px solid var(--color-border);
+}
+.campo-turno-info-alerta {
+  color: var(--color-orange); font-weight: 700;
 }
 
 .campo-nao-encontrado {
