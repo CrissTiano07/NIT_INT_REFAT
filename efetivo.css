@@ -572,6 +572,17 @@ input, select, button, textarea {
 }
 .btn-nav-logout:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
 
+.nav-campo-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary); padding: 4px 12px;
+  border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.05em; transition: all .15s; text-decoration: none;
+}
+.nav-campo-link:hover {
+  border-color: var(--color-accent); color: var(--color-accent); text-decoration: none;
+}
+
 /* ── TABS ──────────────────────────────────────────────────── */
 .tabs-bar {
   height: var(--tabs-h); flex-shrink: 0;
@@ -641,7 +652,7 @@ input, select, button, textarea {
 .supervisao-lista { padding: 4px 0; }
 .sup-linha {
   display: grid;
-  grid-template-columns: 120px 1fr 160px 130px;
+  grid-template-columns: 120px 1fr 160px 130px auto auto;
   gap: 12px; align-items: center;
   padding: 8px 16px;
   border-bottom: 1px solid var(--color-border);
@@ -1137,6 +1148,14 @@ input, select, button, textarea {
 .relatorio-status.relatorio-sucesso {
   background: var(--color-success-dim); color: var(--color-success);
 }
+
+.tab-crosslink {
+  margin-top: 20px; padding: 12px 16px;
+  text-align: center; font-size: 0.82rem;
+  color: var(--color-text-tertiary);
+  border-top: 1px solid var(--color-border);
+}
+.tab-crosslink strong { color: var(--color-accent); }
 
 @media (max-width: 768px) {
   .tab-pane { padding: 12px; }
