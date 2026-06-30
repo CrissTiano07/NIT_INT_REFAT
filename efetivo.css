@@ -1027,6 +1027,32 @@ input, select, button, textarea {
   text-align: center; font-style: italic;
 }
 
+/* ── HIERARQUIA DE ALERTA — horários fora do padrão ──────────── */
+
+/* Nível 1: turno inteiro (cabeçalho da escala) */
+.escala-horario-alerta {
+  color: var(--warning) !important;
+  font-weight: 700;
+}
+
+/* Nível 2: operação individual fora da janela do turno */
+.op-horario-alerta {
+  color: var(--warning) !important;
+  font-weight: 700;
+  background: var(--warning-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.op-alerta-banner {
+  padding: 8px 16px;
+  margin: 0 0 4px;
+  background: var(--warning-dim);
+  border-left: 3px solid var(--warning);
+  color: var(--warning);
+  font-size: .76rem;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .tab-pane { padding: 12px; }
 
