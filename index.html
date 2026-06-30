@@ -135,6 +135,10 @@
       onclick="NIT_EFETIVO.UI.switchTab('recursos'); NIT_EFETIVO.UI.renderRecursos()">
       👥 RECURSOS
     </button>
+    <button class="tab-btn" data-tab="equipes" role="tab"
+      onclick="NIT_EFETIVO.UI.switchTab('equipes'); NIT_EFETIVO.UI.renderEquipes()">
+      🚓 EQUIPES
+    </button>
     <button class="tab-btn" data-tab="metricas" role="tab"
       onclick="NIT_EFETIVO.UI.switchTab('metricas'); NIT_EFETIVO.UI.renderMetricas()">
       📊 TELEMETRIA
@@ -165,6 +169,16 @@
       <div class="loading-state">
         <div class="spinner"></div>
         <span>Carregando banco de recursos...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: EQUIPES ─────────────────────────────────────────── -->
+  <div id="tab-equipes" class="tab-pane hidden" role="tabpanel">
+    <div id="equipes-container" class="recursos-container">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Carregando equipes...</span>
       </div>
     </div>
   </div>
@@ -422,6 +436,34 @@
   </div>
 </div>
 
+<!-- Modal: Cadastrar / Editar Equipe (Viatura) ─────────────── -->
+<div id="modal-cadastro-viatura" class="modal-overlay" onclick="NIT_EFETIVO.Modals._onOverlayClick(event,'modal-cadastro-viatura')">
+  <div class="modal-card modal-card-lg">
+    <div class="modal-header">
+      <h3>CADASTRAR EQUIPE</h3>
+      <button class="modal-close" onclick="NIT_EFETIVO.Modals.fecharCadastroViatura()">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="form-label">Nome da equipe *</label>
+      <input id="vt-nome" type="text" class="input-field" placeholder="Ex: EQUIPE NONATO" autocomplete="off">
+
+      <label class="form-label">Líder / Condutor *</label>
+      <select id="vt-lider-select" class="select-field select-lg"></select>
+
+      <label class="form-label">Tripulantes / Membros</label>
+      <div id="vt-membros-lista" class="vt-membros-container"></div>
+
+      <p class="text-muted" style="margin-top:10px;font-size:.75rem">
+        Equipes cadastradas aqui ficam disponíveis em todos os turnos.
+        Para usar hoje, vá em EQUIPES e clique em "ESCALAR HOJE".
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="NIT_EFETIVO.Modals.fecharCadastroViatura()">CANCELAR</button>
+      <button class="btn btn-primary" onclick="NIT_EFETIVO.Modals.confirmarCadastroViatura()">SALVAR EQUIPE</button>
+    </div>
+  </div>
+</div>
 <!-- Modal: Adicionar à Supervisão ───────────────────────────── -->
 <div id="modal-add-supervisao" class="modal-overlay" onclick="NIT_EFETIVO.Modals._onOverlayClick(event,'modal-add-supervisao')">
   <div class="modal-card">
