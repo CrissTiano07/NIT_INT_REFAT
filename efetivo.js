@@ -78,6 +78,15 @@ const NIT_EFETIVO = (() => {
     return `${d}/${m}/${y}`;
   }
 
+  // Nome de exibição do turno — sempre derivado do enum (manha/tarde/noite)
+  // em vez do campo `label` salvo no Firebase. Isso corrige automaticamente
+  // escalas criadas antes da remoção da duplicação de horário no label
+  // (ex: label antigo = "MANHÃ 05:30–11:30"), sem precisar migrar dados.
+  function turnoLabel(escala) {
+    if (!escala) return '';
+    return CFG.TURNOS[escala.turno]?.label || escala.label || upper(escala.turno || '');
+  }
+
   function getTurnosAtivos() {
     const brt = new Date(new Date().toLocaleString('en-US', { timeZone:'America/Fortaleza' }));
     const min = brt.getHours()*60 + brt.getMinutes();
@@ -615,7 +624,7 @@ const NIT_EFETIVO = (() => {
       if (!el) return;
       if (S.escalaAtiva) {
         const e = S.escalas[S.escalaAtiva];
-        el.textContent = `${e.label||e.turno?.toUpperCase()} · ${e.horarioInicio}–${e.horarioFim}`;
+        el.textContent = `${turnoLabel(e)} · ${e.horarioInicio}–${e.horarioFim}`;
         el.style.cssText = 'color:var(--success);background:var(--success-dim)';
       } else {
         const ativos = getTurnosAtivos();
@@ -655,7 +664,7 @@ const NIT_EFETIVO = (() => {
         <div class="escala-header">
           <div class="escala-title">
             <span class="badge badge-${escala.status}">${upper(escala.status)}</span>
-            <h2>${esc(escala.label||'')} · ${formatData(escala.data)}</h2>
+            <h2>${esc(turnoLabel(escala))} · ${formatData(escala.data)}</h2>
             <span class="escala-horario">${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}</span>
           </div>
           <div class="escala-actions">
@@ -990,7 +999,7 @@ const NIT_EFETIVO = (() => {
             <div class="metrica-label">CADASTRADOS</div>
           </div>
         </div>
-        ${escala ? `<p class="metrica-escala-info">Escala ativa: ${esc(escala.label||'')} · ${formatData(escala.data)}</p>` : ''}
+        ${escala ? `<p class="metrica-escala-info">Escala ativa: ${esc(turnoLabel(escala))} · ${formatData(escala.data)}</p>` : ''}
         <div class="bloco-card" style="margin-top:20px">
           <div class="bloco-titulo">DISTRIBUIÇÃO POR TIPO DE AÇÃO</div>
           <div style="padding:8px 16px 12px">${distHTML}</div>
@@ -1135,7 +1144,7 @@ const NIT_EFETIVO = (() => {
               <a href="tel:${esc(supervisorInfo.contato)}" class="campo-tel">📞 ${esc(supervisorInfo.contato)}</a>
             </div>` : ''}
           <div class="campo-turno-info">
-            ${escala ? `TURNO ${esc(escala.label||'')} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
+            ${escala ? `TURNO ${esc(turnoLabel(escala))} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
           </div>
         </div>`;
       }
