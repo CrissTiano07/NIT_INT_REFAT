@@ -705,8 +705,11 @@ const NIT_EFETIVO = (() => {
       if (!el) return;
       if (S.escalaAtiva) {
         const e = S.escalas[S.escalaAtiva];
-        el.textContent = `${turnoLabel(e)} · ${e.horarioInicio}–${e.horarioFim}`;
-        el.style.cssText = 'color:var(--color-success);background:var(--color-success-dim)';
+        const alerta = escalaForaDoPadrao(e);
+        el.textContent = `${alerta?'⚠ ':''}${turnoLabel(e)} · ${e.horarioInicio}–${e.horarioFim}`;
+        el.style.cssText = alerta
+          ? 'color:var(--color-orange);background:var(--color-orange-dim)'
+          : 'color:var(--color-success);background:var(--color-success-dim)';
       } else {
         const ativos = getTurnosAtivos();
         if (ativos.length) {
@@ -1200,13 +1203,17 @@ const NIT_EFETIVO = (() => {
           corpo = postos.map(p => {
             const op  = operacoes[p.operacaoId] || {};
             const url = `https://maps.google.com/maps?q=${encodeURIComponent((p.local||'') + ', Fortaleza, CE')}`;
+            const horarioAlerta = operacaoForaDoPadrao(p, escala);
             return `<div class="campo-qth-destaque">
               <div class="campo-qtu-num">QRU Nº ${p.numero}</div>
               <div class="campo-qth-label">QTH</div>
               <div class="campo-qth-valor">${esc(p.local||'—')}</div>
               <div class="campo-qth-bairro">${esc(p.bairro||op.bairro||'')}</div>
               <div class="campo-acao-badge">${esc(p.tipoAcao||'')}</div>
-              ${op.nome ? `<div class="campo-op-nome">Operação: ${esc(op.nome)}${op.horario?` · ${op.horario}h`:''}</div>` : ''}
+              ${op.nome ? `<div class="campo-op-nome${horarioAlerta ? ' campo-op-nome-alerta' : ''}">
+                Operação: ${esc(op.nome)}${op.horario?` · ${horarioAlerta?'⚠ ':''}${op.horario}h`:''}
+              </div>` : ''}
+              ${horarioAlerta ? `<div class="campo-horario-alerta-nota">⚠ Fora do horário oficial do turno (${esc(escala?.horarioInicio)}–${esc(escala?.horarioFim)})</div>` : ''}
               ${p.obs   ? `<div class="campo-obs">${esc(p.obs)}</div>` : ''}
               <a href="${url}" target="_blank" rel="noopener" class="btn-maps">📍 Abrir no Maps</a>
             </div>`;
@@ -1229,8 +1236,8 @@ const NIT_EFETIVO = (() => {
               <span>Supervisor: ${esc(supervisorInfo.nome)}</span>
               <a href="tel:${esc(supervisorInfo.contato)}" class="campo-tel">📞 ${esc(supervisorInfo.contato)}</a>
             </div>` : ''}
-          <div class="campo-turno-info">
-            ${escala ? `TURNO ${esc(turnoLabel(escala))} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
+          <div class="campo-turno-info${escalaForaDoPadrao(escala) ? ' campo-turno-info-alerta' : ''}">
+            ${escala ? `${escalaForaDoPadrao(escala)?'⚠ ':''}TURNO ${esc(turnoLabel(escala))} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
           </div>
         </div>`;
       }
