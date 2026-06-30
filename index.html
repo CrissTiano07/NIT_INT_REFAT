@@ -192,6 +192,22 @@
   <!-- TAB: MÉTRICAS ────────────────────────────────────────── -->
   <div id="tab-metricas" class="tab-pane hidden" role="tabpanel">
     <div id="metricas-container" class="metricas-container"></div>
+
+    <div class="bloco-card relatorio-card">
+      <div class="bloco-titulo">RELATÓRIO MENSAL</div>
+      <div class="relatorio-body">
+        <p class="text-muted">
+          Gera a planilha .xlsx no formato oficial usado pela AMC — 17 abas
+          por tipo de missão + TOTAL + BAIRROS, igual ao modelo atual.
+          Processado aqui no navegador, sem servidor. QRUs de operações
+          sem "Tipo de Missão" definido entram numa aba separada
+          "NÃO CLASSIFICADO" para não se perderem.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="NIT_EFETIVO.Modals.abrirRelatorioMensal()">
+          📊 GERAR RELATÓRIO MENSAL
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- TAB: CAMPO PREVIEW ───────────────────────────────────── -->
@@ -287,6 +303,11 @@
       <label class="form-label">Nome da operação / evento *</label>
       <input id="op-nome" type="text" class="input-field" placeholder="Ex: CICLOFAIXA DE LAZER" autocomplete="off">
 
+      <label class="form-label">Tipo de missão * <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(categoria do Relatório Mensal)</span></label>
+      <select id="op-tipo-missao" class="select-field">
+        <option value="">— Selecionar —</option>
+      </select>
+
       <label class="form-label">Bairro / Área</label>
       <input id="op-bairro" type="text" class="input-field" placeholder="Ex: ALDEOTA">
 
@@ -312,6 +333,14 @@
         <div class="grid-full">
           <label class="form-label">Nome da operação *</label>
           <input id="tmpl-nome" type="text" class="input-field" placeholder="Ex: CICLOFAIXA DE LAZER">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="grid-full">
+          <label class="form-label">Tipo de missão * <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(categoria do Relatório Mensal)</span></label>
+          <select id="tmpl-tipo-missao" class="select-field">
+            <option value="">— Selecionar —</option>
+          </select>
         </div>
       </div>
       <div class="form-row">
@@ -517,6 +546,32 @@
     </div>
   </div>
 </div>
+
+<!-- Modal: Relatório Mensal ──────────────────────────────────── -->
+<div id="modal-relatorio-mensal" class="modal-overlay" onclick="NIT_EFETIVO.Modals._onOverlayClick(event,'modal-relatorio-mensal')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>RELATÓRIO MENSAL</h3>
+      <button class="modal-close" onclick="NIT_EFETIVO.Modals.fecharRelatorioMensal()">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="form-label">Mês de referência</label>
+      <input id="relatorio-mes" type="month" class="input-field">
+
+      <div id="relatorio-status" class="relatorio-status hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="NIT_EFETIVO.Modals.fecharRelatorioMensal()">CANCELAR</button>
+      <button class="btn btn-primary" onclick="NIT_EFETIVO.Modals.confirmarRelatorioMensal()">GERAR E BAIXAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  SHEETJS — geração de relatório .xlsx direto no navegador,    -->
+<!--  sem backend. Mesmo princípio do Firebase: CDN, sem build.   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!--  FIREBASE + APP                                             -->
