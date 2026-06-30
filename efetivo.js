@@ -33,6 +33,8 @@ const NIT_EFETIVO = (() => {
       'CONTROLE/COIBIR DIREITA', 'BLOQUEIO NA LARGADA', 'CONTROLE NA'
     ],
     STATUS_RECURSO: ['disponivel','escalado','ausente','afastado','desligado'],
+    STATUS_COLORS: { disponivel:'success', escalado:'accent', ausente:'warning',
+                      afastado:'muted', desligado:'danger' },
     CARGOS: ['SUPERVISOR','AUXILIAR','MOTOCICLISTA','MONITOR','ORIENTADOR']
   };
 
@@ -130,6 +132,23 @@ const NIT_EFETIVO = (() => {
     return Object.entries(CFG.TURNOS)
       .filter(([,t]) => min >= t.minI && min <= t.minF)
       .map(([k]) => k);
+  }
+
+  // ── LISTAGEM / CONTAGEM — usados em vários renders (Recursos,
+  // Equipes, Templates, combos de seleção) para evitar reescrever o
+  // mesmo comparador/filtro em cada lugar.
+  function sortByNome(entries) {
+    return [...entries].sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'));
+  }
+
+  function recursosOrdenados(filtroFn = null) {
+    let entries = Object.entries(S.recursos);
+    if (filtroFn) entries = entries.filter(filtroFn);
+    return sortByNome(entries);
+  }
+
+  function contarPorStatus(status) {
+    return Object.values(S.recursos).filter(r => r.status === status).length;
   }
 
   function debounce(fn, delay) {
@@ -340,34 +359,43 @@ const NIT_EFETIVO = (() => {
       return ref.key;
     },
 
-    async adicionarPosto(dados) {
-      const postosEscala = Object.values(S.postos).filter(p => p.escalaId === dados.escalaId);
-      const numero = postosEscala.length > 0
+    // ── Alocação de posto — agente OU viatura, lógica única ──────
+    // Antes desta consolidação, liberar/escalar tinha 3 cópias quase
+    // idênticas (criar/editar/excluir posto) e a versão de "editar"
+    // só liberava a alocação anterior quando era um agente — uma
+    // viatura trocada de posto nunca voltava para "disponível".
+    // Corrigido aqui ao unificar em um único caminho de código.
+    async _statusAlocacao(alocacao, status) {
+      if (!alocacao?.id) return;
+      if (alocacao.tipo === 'viatura') {
+        await S.db.ref(`efetivo/viaturas/${alocacao.id}/status`)
+          .set(status === 'disponivel' ? 'disponivel' : 'escalada');
+      } else {
+        await DB.setStatusRecurso(alocacao.id, status);
+      }
+    },
+
+    // Próximo número sequencial de QRU dentro de uma escala.
+    _proximoNumeroPosto(escalaId) {
+      const postosEscala = Object.values(S.postos).filter(p => p.escalaId === escalaId);
+      return postosEscala.length > 0
         ? Math.max(...postosEscala.map(p => p.numero || 0)) + 1 : 1;
+    },
 
+    async adicionarPosto(dados) {
+      const numero = DB._proximoNumeroPosto(dados.escalaId);
       const ref = await S.db.ref('efetivo/postos').push({ ...dados, numero, criadoEm: Date.now() });
-
-      // Atualizar status do recurso
-      if (dados.alocacao?.tipo === 'agente'  && dados.alocacao?.id)
-        await DB.setStatusRecurso(dados.alocacao.id, 'escalado');
-      if (dados.alocacao?.tipo === 'viatura' && dados.alocacao?.id)
-        await S.db.ref(`efetivo/viaturas/${dados.alocacao.id}/status`).set('escalada');
-
+      await DB._statusAlocacao(dados.alocacao, 'escalado');
       Log.write('posto_criado', null, { postoId:ref.key, local:dados.local, numero });
       return ref.key;
     },
 
     async editarPosto(postoId, dados, alocacaoAnterior) {
-      // Libera o recurso anterior se mudou
-      if (alocacaoAnterior?.tipo === 'agente' &&
-          alocacaoAnterior.id !== dados.alocacao?.id) {
-        await DB.setStatusRecurso(alocacaoAnterior.id, 'disponivel');
+      // Libera a alocação anterior (agente OU viatura) se ela mudou
+      if (alocacaoAnterior?.id && alocacaoAnterior.id !== dados.alocacao?.id) {
+        await DB._statusAlocacao(alocacaoAnterior, 'disponivel');
       }
-      // Escala o novo recurso
-      if (dados.alocacao?.tipo === 'agente' && dados.alocacao?.id)
-        await DB.setStatusRecurso(dados.alocacao.id, 'escalado');
-      if (dados.alocacao?.tipo === 'viatura' && dados.alocacao?.id)
-        await S.db.ref(`efetivo/viaturas/${dados.alocacao.id}/status`).set('escalada');
+      await DB._statusAlocacao(dados.alocacao, 'escalado');
 
       await S.db.ref(`efetivo/postos/${postoId}`).update({
         ...dados, updatedAt: Date.now(), updatedBy: S.user?.email
@@ -378,11 +406,7 @@ const NIT_EFETIVO = (() => {
     async excluirPosto(postoId) {
       const posto = S.postos[postoId];
       if (!posto) return;
-      // Liberar recurso alocado
-      if (posto.alocacao?.tipo === 'agente' && posto.alocacao?.id)
-        await DB.setStatusRecurso(posto.alocacao.id, 'disponivel');
-      if (posto.alocacao?.tipo === 'viatura' && posto.alocacao?.id)
-        await S.db.ref(`efetivo/viaturas/${posto.alocacao.id}/status`).set('disponivel');
+      await DB._statusAlocacao(posto.alocacao, 'disponivel');
       await S.db.ref(`efetivo/postos/${postoId}`).remove();
       Log.write('posto_excluido', null, { postoId, local: posto.local, numero: posto.numero });
     },
@@ -422,14 +446,16 @@ const NIT_EFETIVO = (() => {
         horario: tmpl.horario || '',
         templateId
       });
-      const postos = tmpl.postosPadrao || [];
-      for (const p of postos) {
-        const postosEscala = Object.values(S.postos).filter(x => x.escalaId === escalaId);
-        const numero = postosEscala.length > 0
-          ? Math.max(...postosEscala.map(x => x.numero||0)) + 1 : 1;
+      // Número calculado uma única vez e incrementado em memória — ler
+      // S.postos a cada iteração seria não-confiável aqui, pois esse
+      // estado só atualiza de forma assíncrona via listener do Firebase
+      // (poderia gerar QRUs com números duplicados ao aplicar vários
+      // postos de uma vez).
+      let numero = DB._proximoNumeroPosto(escalaId);
+      for (const p of (tmpl.postosPadrao || [])) {
         await S.db.ref('efetivo/postos').push({
           escalaId, operacaoId: opId,
-          numero,
+          numero: numero++,
           local:     upper(p.local || ''),
           bairro:    upper(tmpl.bairro || ''),
           horario:   tmpl.horario || '',
@@ -857,8 +883,6 @@ const NIT_EFETIVO = (() => {
 
       const filtroSt = $('filtro-status')?.value || 'todos';
       const busca    = buscaValor.toLowerCase().trim();
-      const corBadge = { disponivel:'success', escalado:'accent', ausente:'warning',
-                         afastado:'muted', desligado:'danger' };
 
       let lista = Object.entries(S.recursos);
       if (filtroSt !== 'todos') lista = lista.filter(([,r]) => r.status === filtroSt);
@@ -866,12 +890,12 @@ const NIT_EFETIVO = (() => {
         (r.nome||'').toLowerCase().includes(busca) ||
         (r.cargo||'').toLowerCase().includes(busca) ||
         (r.matricula||'').toLowerCase().includes(busca));
-      lista.sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'', 'pt-BR'));
+      lista = sortByNome(lista);
 
       const total      = Object.keys(S.recursos).length;
-      const disponivel = Object.values(S.recursos).filter(r=>r.status==='disponivel').length;
-      const escalado   = Object.values(S.recursos).filter(r=>r.status==='escalado').length;
-      const ausente    = Object.values(S.recursos).filter(r=>r.status==='ausente').length;
+      const disponivel = contarPorStatus('disponivel');
+      const escalado   = contarPorStatus('escalado');
+      const ausente    = contarPorStatus('ausente');
       const w          = canWrite();
 
       const linhas = lista.map(([id,r]) => `
@@ -880,7 +904,7 @@ const NIT_EFETIVO = (() => {
           <td class="recurso-nome">${esc(r.nome||'—')}</td>
           <td>${esc(r.cargo||'—')}</td>
           <td>${esc(CFG.TURNOS[r.turno_padrao]?.label||r.turno_padrao||'—')}</td>
-          <td><span class="badge badge-${corBadge[r.status]||'muted'}">${upper(r.status||'')}</span></td>
+          <td><span class="badge badge-${CFG.STATUS_COLORS[r.status]||'muted'}">${upper(r.status||'')}</span></td>
           <td><span class="font-mono">${esc(r.telefone||'—')}</span></td>
           <td>${w ? `
             <select class="select-status-inline" onchange="NIT_EFETIVO.Actions.mudarStatus('${id}',this.value)">
@@ -936,8 +960,7 @@ const NIT_EFETIVO = (() => {
       const cont = $('equipes-container');
       if (!cont) return;
 
-      const lista = Object.entries(S.viaturas)
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'));
+      const lista = sortByNome(Object.entries(S.viaturas));
       const escaladasHoje = S.escalaAtiva
         ? (S.escalas[S.escalaAtiva]?.viaturasEscaladas || {}) : {};
       const w = canWrite();
@@ -1001,9 +1024,8 @@ const NIT_EFETIVO = (() => {
         ? Object.values(S.postos).filter(p => p.escalaId === S.escalaAtiva) : [];
       const qruTotal      = postosAtivos.length;
       const pessoasCampo  = postosAtivos.reduce((a,p) => a + (p.qruPessoas||1), 0);
-      const disponivel    = Object.values(S.recursos).filter(r=>r.status==='disponivel').length;
-      const escalado      = Object.values(S.recursos).filter(r=>r.status==='escalado').length;
-      const ausente       = Object.values(S.recursos).filter(r=>r.status==='ausente').length;
+      const disponivel    = contarPorStatus('disponivel');
+      const ausente       = contarPorStatus('ausente');
       const total         = Object.keys(S.recursos).length;
       const escala        = S.escalaAtiva ? S.escalas[S.escalaAtiva] : null;
 
@@ -1058,8 +1080,7 @@ const NIT_EFETIVO = (() => {
       const cont = $('templates-container');
       if (!cont) return;
 
-      const lista = Object.entries(S.templates)
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'));
+      const lista = sortByNome(Object.entries(S.templates));
 
       const cards = lista.map(([id, t]) => {
         const nPostos = (t.postosPadrao||[]).length;
@@ -1427,15 +1448,12 @@ const NIT_EFETIVO = (() => {
 
     // Lista combinada de agentes + viaturas, no formato do combo
     _itemsRecursoViatura() {
-      const agentes = Object.entries(S.recursos)
-        .filter(([,r]) => r.status !== 'desligado')
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'))
+      const agentes = recursosOrdenados(([,r]) => r.status !== 'desligado')
         .map(([id,r]) => ({
           value: `a:${id}`,
           label: `${r.nome} · ${r.cargo||'—'} · ${upper(r.status||'')}`
         }));
-      const vts = Object.entries(S.viaturas)
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'))
+      const vts = sortByNome(Object.entries(S.viaturas))
         .map(([id,v]) => ({ value: `v:${id}`, label: `🚓 ${v.nome||id}` }));
       return [...agentes, ...vts];
     },
@@ -1548,8 +1566,7 @@ const NIT_EFETIVO = (() => {
     // ── SUPERVISÃO ───────────────────────────────────────────
     abrirAddSupervisao() {
       if (!S.escalaAtiva) { UI.toast('Abra um turno primeiro','warning'); return; }
-      const items = Object.entries(S.recursos)
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'))
+      const items = recursosOrdenados()
         .map(([id,r]) => ({ value:id, label:`${r.nome} · ${r.cargo||'—'}` }));
       Modals._montarCombo('sup-recurso-input', 'sup-recurso-list', items);
       Modals._open('modal-add-supervisao');
@@ -1688,12 +1705,10 @@ const NIT_EFETIVO = (() => {
       const nomeEl = $('vt-nome');
       if (nomeEl) nomeEl.value = v.nome || '';
 
-      const recursosOrdenados = Object.entries(S.recursos)
-        .filter(([,r]) => r.status !== 'desligado')
-        .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'));
+      const recursosOrd = recursosOrdenados(([,r]) => r.status !== 'desligado');
 
       // Combo digitável de líder
-      const itemsLider = recursosOrdenados.map(([id,r]) =>
+      const itemsLider = recursosOrd.map(([id,r]) =>
         ({ value:id, label:`${r.nome} · ${r.cargo||'—'}` }));
       Modals._montarCombo('vt-lider-input', 'vt-lider-list', itemsLider, v.liderId || null);
 
@@ -1703,8 +1718,8 @@ const NIT_EFETIVO = (() => {
       if (filtroEl) filtroEl.value = '';
       if (membrosCont) {
         const membrosAtuais = v.membrosIds || {};
-        membrosCont.innerHTML = recursosOrdenados.length
-          ? recursosOrdenados.map(([id,r]) => `
+        membrosCont.innerHTML = recursosOrd.length
+          ? recursosOrd.map(([id,r]) => `
               <label class="vt-membro-item">
                 <input type="checkbox" value="${id}"${membrosAtuais[id]?' checked':''}>
                 <span>${esc(r.nome)} · ${r.cargo||''}</span>
