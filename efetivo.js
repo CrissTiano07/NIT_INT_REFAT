@@ -688,15 +688,15 @@ const NIT_EFETIVO = (() => {
       if (S.escalaAtiva) {
         const e = S.escalas[S.escalaAtiva];
         el.textContent = `${turnoLabel(e)} · ${e.horarioInicio}–${e.horarioFim}`;
-        el.style.cssText = 'color:var(--success);background:var(--success-dim)';
+        el.style.cssText = 'color:var(--color-success);background:var(--color-success-dim)';
       } else {
         const ativos = getTurnosAtivos();
         if (ativos.length) {
           el.textContent = ativos.map(t => CFG.TURNOS[t].label).join('+') + ' · SEM ESCALA';
-          el.style.cssText = 'color:var(--warning);background:var(--warning-dim)';
+          el.style.cssText = 'color:var(--color-warning);background:var(--color-warning-dim)';
         } else {
           el.textContent = 'FORA DE TURNO';
-          el.style.cssText = 'color:var(--text-muted);background:var(--muted-dim)';
+          el.style.cssText = 'color:var(--color-decorative);background:var(--color-text-tertiary-dim)';
         }
       }
     },
