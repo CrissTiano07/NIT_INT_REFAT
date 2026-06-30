@@ -795,8 +795,17 @@ const NIT_EFETIVO = (() => {
       // Persiste última busca bem-sucedida
       localStorage.setItem('efetivo_campo_ultimo', recurso.nome || '');
 
+      // Só QRUs do turno ATIVO — sem isso, qualquer agente que já
+      // trabalhou mais de um turno acumula postos de dias/turnos
+      // passados (que nunca são apagados ao encerrar turno) junto
+      // com o de hoje. "Consulta de QTH" deve responder "onde estou
+      // trabalhando AGORA", não "todo turno que já trabalhei".
+      const postosDoTurno = S.escalaAtiva
+        ? Object.entries(S.postos).filter(([,p]) => p.escalaId === S.escalaAtiva)
+        : [];
+
       // Postos diretos (agente alocado individualmente)
-      const postosDiretos = Object.entries(S.postos)
+      const postosDiretos = postosDoTurno
         .filter(([,p]) => p.alocacao?.id === recursoId)
         .sort(([,a],[,b]) => (a.numero||0) - (b.numero||0));
 
@@ -808,7 +817,7 @@ const NIT_EFETIVO = (() => {
           return v.liderId === recursoId || membros.includes(recursoId);
         });
         if (viat) {
-          postosViatura = Object.entries(S.postos)
+          postosViatura = postosDoTurno
             .filter(([,p]) => p.alocacao?.id === viat[0])
             .sort(([,a],[,b]) => (a.numero||0) - (b.numero||0));
         }
@@ -931,7 +940,10 @@ const NIT_EFETIVO = (() => {
           const bateOp = (op.nome||'').toLowerCase().includes(busca) ||
                          (op.bairro||'').toLowerCase().includes(busca);
           const batePosto = postosEscala.some(([,p]) =>
-            p.operacaoId === opId && (p.local||'').toLowerCase().includes(busca));
+            p.operacaoId === opId && (
+              (p.local||'').toLowerCase().includes(busca) ||
+              (p.alocacao?.nome||'').toLowerCase().includes(busca)
+            ));
           return bateOp || batePosto;
         });
       }
@@ -973,7 +985,7 @@ const NIT_EFETIVO = (() => {
         </div>
         ${totalOps > 1 ? `
           <input id="busca-escala" class="input-search" style="width:100%;margin-bottom:16px"
-            placeholder="Buscar operação, bairro ou endereço de QRU..."
+            placeholder="Buscar por nome, operação, bairro ou endereço..."
             value="${esc(buscaValor)}" oninput="NIT_EFETIVO.UI.renderEscala()">
         ` : ''}
         ${UI._supervisaoHTML(escala)}
