@@ -52,9 +52,7 @@
   --color-text-tertiary-dim: rgba(148,163,184,0.12);
   --color-text-tertiary-dim: color-mix(in srgb, var(--color-text-tertiary) 12%, transparent);
 
-  /* Cores adicionais identificadas no NIT Sistema Integrado (Semáforos) —
-     registradas no vocabulário mesmo sem uso imediato no Efetivo, para
-     manter os dois sistemas com a mesma paleta semântica disponível. */
+  /* Cores adicionais identificadas no NIT Sistema Integrado (Semáforos) */
   --color-coral:           #ff6b6b;
   --color-coral-dim:       rgba(255,107,107,0.12);
   --color-coral-dim:       color-mix(in srgb, var(--color-coral) 12%, transparent);
@@ -73,6 +71,33 @@
   /* Tipografia */
   --font-ui:   'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* ── ESPAÇAMENTO — escala 4px ───────────────────────────────
+     Use --space-* em vez de valores avulsos. Os valores fixos
+     existentes no CSS são legado; novos componentes usam a escala.
+     Mínimo de touch target (Apple/Google): 44px = --space-11.      */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-11: 44px;   /* touch target mínimo */
+
+  /* ── Z-INDEX — camadas nomeadas ─────────────────────────────
+     Conflito resolvido: combobox (--z-combo: 2000) deve ficar
+     ACIMA do modal (--z-modal: 500) — posição:fixed garante isso.
+     Toast (--z-toast: 9999) sempre no topo de tudo.               */
+  --z-nav:   100;
+  --z-modal: 500;
+  --z-combo: 2000;
+  --z-toast: 9999;
+
+  /* ── ANIMAÇÕES ──────────────────────────────────────────────*/
+  --duration-fast:   150ms;
+  --duration-normal: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* suave, sem bounce */
 
   /* Layout */
   --nav-h:    52px;
@@ -95,6 +120,16 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Focus visível — essencial para acessibilidade por teclado.
+   Usa :focus-visible em vez de :focus para não mostrar anel em
+   cliques de mouse (comportamento correto nos navegadores modernos). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+:focus:not(:focus-visible) { outline: none; }
 
 a { color: var(--color-accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -119,7 +154,7 @@ input, select, button, textarea {
 /* ── TOASTS ────────────────────────────────────────────────── */
 #toast-container {
   position: fixed; bottom: 24px; right: 24px;
-  z-index: 9999;
+  z-index: var(--z-toast);
   display: flex; flex-direction: column; gap: 8px;
   pointer-events: none;
 }
@@ -173,12 +208,34 @@ input, select, button, textarea {
   border-color: var(--color-danger);
 }
 .btn-danger:hover { background: var(--color-danger); color: #fff; }
-.btn-sm { height: 30px; min-height: 30px; padding: 0 10px; font-size: 0.75rem; }
+/* Área de toque mínima — --space-11 = 44px (Apple HIG / Google Material)
+   .btn já declara min-height: 44px desde a criação.
+   .btn-sm e .btn-icon são menores visualmente mas precisam de área de
+   toque equivalente para uso em campo (sol, movimento, luvas). */
+.btn-sm {
+  height: 30px;
+  min-height: 30px;    /* visual: compacto */
+  padding: 0 10px;
+  font-size: 0.75rem;
+  /* Touch: pseudo-elemento expande a área clicável sem mudar o layout */
+  position: relative;
+}
+.btn-sm::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * (var(--space-11) - 100%) / 2) 0;
+  min-height: var(--space-11);
+}
+
 .btn-icon {
   background: none; border: none; cursor: pointer;
   color: var(--color-text-tertiary); padding: 4px;
-  border-radius: var(--radius); transition: color .15s;
+  border-radius: var(--radius); transition: color var(--duration-fast);
   font-size: 0.9rem;
+  /* Touch: garante área de 44×44px sem afetar layout inline */
+  min-width: var(--space-11);
+  min-height: var(--space-11);
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .btn-icon:hover { color: var(--color-text-primary); }
 
@@ -426,59 +483,90 @@ input, select, button, textarea {
   font-family: var(--font-mono);
 }
 
+/* ── CARD DO MODO CAMPO — QTH (onde) / QRU (o quê) ─────────
+   Dois conceitos distintos, duas zonas visuais distintas.
+   QTH = ONDE: protagonista, letra grande, link Maps no topo.
+   QRU = O QUÊ: contexto, letra menor, abaixo do endereço.
+   O agente no sol precisa encontrar o endereço sem esforço.   */
+
 .campo-qth-destaque {
-  padding: 20px 16px;
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+/* ZONA 1 — QTH: ONDE */
+.campo-zona-onde {
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  background: rgba(88,166,255,0.04); /* accent-dim muito sutil */
   border-bottom: 1px solid var(--color-border);
 }
-.campo-qtu-num {
-  font-family: var(--font-mono); font-size: 0.72rem;
-  font-weight: 600; letter-spacing: 0.1em;
-  color: var(--color-accent); margin-bottom: 4px;
-}
-.campo-qth-label {
-  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.14em;
-  color: var(--color-text-tertiary); text-transform: uppercase; margin-bottom: 4px;
+.campo-zona-onde-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--color-decorative); text-transform: uppercase;
+  margin-bottom: var(--space-2);
 }
 .campo-qth-valor {
-  font-size: 1.05rem; font-weight: 600;
-  color: var(--color-text-primary); line-height: 1.3;
-  margin-bottom: 4px;
+  font-size: 1.15rem; font-weight: 700;
+  color: var(--color-text-primary); line-height: 1.25;
+  margin-bottom: var(--space-1);
+  letter-spacing: -0.01em;
 }
 .campo-qth-bairro {
-  font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 10px;
+  font-size: 0.82rem; color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+.btn-maps {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 44px; padding: 0 var(--space-4);
+  background: var(--color-accent-dim); color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius); font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: all var(--duration-fast); text-decoration: none;
+  min-width: 160px; justify-content: center;
+}
+.btn-maps:hover {
+  background: var(--color-accent); color: var(--color-bg); text-decoration: none;
+}
+
+/* ZONA 2 — QRU: O QUÊ */
+.campo-zona-oque {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.campo-qtu-num {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  font-weight: 700; letter-spacing: 0.12em;
+  color: var(--color-accent); margin-bottom: var(--space-2);
+  text-transform: uppercase;
 }
 .campo-acao-badge {
   display: inline-block; font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.08em; color: var(--color-warning);
   background: var(--color-warning-dim); padding: 3px 10px;
-  border-radius: 4px; margin-bottom: 10px;
+  border-radius: 4px; margin-bottom: var(--space-2);
 }
 .campo-op-nome {
-  font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 12px;
+  font-size: 0.8rem; color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
 }
-.campo-op-nome-alerta {
-  color: var(--color-orange); font-weight: 600;
-}
+.campo-op-nome-alerta { color: var(--color-orange); font-weight: 600; }
 .campo-horario-alerta-nota {
   font-size: 0.72rem; color: var(--color-orange);
   background: var(--color-orange-dim);
   border-left: 3px solid var(--color-orange);
-  padding: 6px 10px; margin-bottom: 12px; border-radius: 4px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3); border-radius: 4px;
 }
 .campo-obs {
   font-size: 0.78rem; color: var(--color-text-tertiary);
-  font-style: italic; margin-bottom: 12px;
+  font-style: italic; margin-top: var(--space-1);
 }
-.btn-maps {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 40px; padding: 0 16px;
-  background: var(--color-accent-dim); color: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius); font-size: 0.82rem; font-weight: 600;
-  cursor: pointer; transition: all .15s; text-decoration: none;
-}
-.btn-maps:hover {
-  background: var(--color-accent); color: #0d1826; text-decoration: none;
+
+/* Label de zona (QTH / QRU) — herdado pelo bloco de supervisão também */
+.campo-qth-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--color-decorative); text-transform: uppercase;
+  margin-bottom: var(--space-1);
 }
 
 .campo-sem-posto {
@@ -545,7 +633,7 @@ input, select, button, textarea {
   padding: 0 20px; gap: 16px;
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border-strong);
-  position: sticky; top: 0; z-index: 100;
+  position: sticky; top: 0; z-index: var(--z-nav);
 }
 .nav-brand { display: flex; align-items: baseline; gap: 6px; }
 .nav-efetivo {
@@ -880,13 +968,27 @@ input, select, button, textarea {
    ═══════════════════════════════════════════════════════════════ */
 .modal-overlay {
   display: none;
-  position: fixed; inset: 0; z-index: 500;
+  position: fixed; inset: 0; z-index: var(--z-modal);
   background: rgba(0,0,0,0.7);
   align-items: center; justify-content: center;
-  padding: 20px;
+  padding: var(--space-5);
   backdrop-filter: blur(2px);
 }
-.modal-overlay.open { display: flex; }
+.modal-overlay.open {
+  display: flex;
+  animation: overlayIn var(--duration-normal) var(--ease-out);
+}
+.modal-overlay.open .modal-card {
+  animation: cardIn var(--duration-normal) var(--ease-out);
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .modal-card {
   background: var(--color-bg-surface);
@@ -1054,7 +1156,7 @@ input, select, button, textarea {
 .combo-list {
   display: none;
   position: fixed; /* posição real calculada via JS — evita corte pela rolagem do modal */
-  z-index: 2000;
+  z-index: var(--z-combo);
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
