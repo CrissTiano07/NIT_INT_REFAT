@@ -1804,43 +1804,29 @@ const NIT_EFETIVO = (() => {
       hint.style.display = val ? 'none' : '';
     },
 
-    // ── FLUXO UNIFICADO: NOVA OPERAÇÃO + QRU ────────────────
-    // Cria operação nova E o primeiro QRU em um único formulário.
-    // Cliques: 1 (antes eram 2 modais separados).
+    // ── FLUXO LIMPO: NOVA OPERAÇÃO + QRU em uma única tela ──────
+    // Sequência exata: a.Bairro → b.Tipo → c.Horário → d.Endereço → e.Obs → f.Orientador
+    // Templates são aplicados pela aba TEMPLATES, não por este modal.
     abrirAddOperacao() {
       if (!S.escalaAtiva) { UI.toast('Abra um turno primeiro','warning'); return; }
-      Modals._editOperacaoId = null;
-      Modals._editPostoId    = null;
+      Modals._editOperacaoId    = null;
+      Modals._editPostoId       = null;
       Modals._modoQruEmOperacao = null;
 
-      // Mostrar contexto de operação (seção superior)
-      const ctxSec = $('op-contexto-section');
-      const qruSec = $('op-qru-section');
+      // Mostrar ambas as seções para nova operação
+      const ctxSec = $('op-contexto-section'), qruSec = $('op-qru-section');
       if (ctxSec) ctxSec.style.display = '';
       if (qruSec) qruSec.style.display = '';
 
-      // Templates
-      const tmplSection = $('op-template-section');
-      const tmplSel     = $('op-template-select');
-      const templates   = Object.entries(S.templates);
-      if (tmplSection && tmplSel) {
-        if (templates.length) {
-          tmplSection.style.display = '';
-          tmplSel.innerHTML =
-            `<option value="">— Sem template —</option>` +
-            templates
-              .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'))
-              .map(([id,t]) => `<option value="${id}">${esc(t.nome)}${t.bairro?' · '+upper(t.bairro):''}</option>`)
-              .join('');
-        } else {
-          tmplSection.style.display = 'none';
-        }
-      }
+      // Tipo de ação oculto (CONTROLE como padrão silencioso)
+      const taSec = $('tipo-acao-section');
+      if (taSec) taSec.classList.add('hidden');
+      Modals._montarTipoAcao('CONTROLE');
 
-      // Bairro autocomplete
+      // a. Bairro autocomplete
       Modals._montarBairroCombo();
 
-      // Tipo de missão
+      // b. Tipo de missão
       const tipoSel = $('op-tipo-missao');
       if (tipoSel) {
         tipoSel.innerHTML = `<option value="">— Selecionar —</option>` +
@@ -1848,65 +1834,54 @@ const NIT_EFETIVO = (() => {
         tipoSel.onchange = Modals._autoGerarNomeOp;
       }
 
-      // Nome auto-gerado (não editado manualmente inicialmente)
+      // Nome interno reiniciado
       const nomeEl = $('op-nome');
-      if (nomeEl) { nomeEl.value = ''; nomeEl._editadoManualmente = false;
-        nomeEl.addEventListener('input', () => { nomeEl._editadoManualmente = true; }, { once:true });
-      }
+      if (nomeEl) { nomeEl.value = ''; nomeEl._editadoManualmente = false; }
 
-      // Tipos de ação para o QRU
-      const ts = $('posto-tipo-acao');
-      Modals._montarTipoAcao();
-
-      // Orientador/Equipe combo
+      // f. Orientador/Equipe
       Modals._montarCombo('posto-recurso-input', 'posto-recurso-list', Modals._itemsOrientadorEquipe());
-      Modals._onOrientadorInput(); // inicializa hint
+      Modals._onOrientadorInput();
 
-      // Título e botão
-      const titulo = $('modal-add-operacao-titulo');
-      const btn    = $('btn-confirmar-add-op');
-      if (titulo) titulo.textContent = 'NOVO QRU';
-      if (btn)    btn.textContent    = 'ADICIONAR QRU';
+      // Limpar campos d e e
+      const clr = id => { const el=$(id); if(el) el.value=''; };
+      clr('posto-local'); clr('posto-obs');
 
+      $('modal-add-operacao-titulo').textContent = 'NOVO QRU';
+      $('btn-confirmar-add-op').textContent      = 'ADICIONAR QRU';
       Modals._open('modal-add-operacao');
     },
 
-    // Modo: adicionar QRU a uma operação já existente (contexto oculto)
+    // Adicionar QRU a uma operação já existente — mostra só d/e/f
     abrirAddPosto(opId) {
       const op = S.operacoes[opId] || {};
-      Modals._editOperacaoId = null;
-      Modals._editPostoId    = null;
+      Modals._editOperacaoId    = null;
+      Modals._editPostoId       = null;
       Modals._modoQruEmOperacao = opId;
 
-      // Esconder contexto de operação (já existe)
-      const ctxSec = $('op-contexto-section');
-      const tmplSec = $('op-template-section');
-      if (ctxSec)  ctxSec.style.display  = 'none';
-      if (tmplSec) tmplSec.style.display = 'none';
-      const qruSec = $('op-qru-section');
+      const ctxSec = $('op-contexto-section'), qruSec = $('op-qru-section');
+      if (ctxSec) ctxSec.style.display = 'none';
       if (qruSec) qruSec.style.display = '';
 
-      // Herdar bairro e horário da operação (campos hidden)
+      // Tipo de ação oculto (CONTROLE como padrão silencioso)
+      const taSec = $('tipo-acao-section');
+      if (taSec) taSec.classList.add('hidden');
+      Modals._montarTipoAcao('CONTROLE');
+
+      // Herdar bairro/horário da operação
       const bEl = $('posto-bairro'), hEl = $('posto-horario');
       if (bEl) bEl.value = op.bairro  || '';
       if (hEl) hEl.value = op.horario || '';
 
-      // Tipos de ação — default CONTROLE (mais comum)
-      Modals._montarTipoAcao();
-
-      // Orientador/Equipe
+      // f. Orientador/Equipe
       Modals._montarCombo('posto-recurso-input', 'posto-recurso-list', Modals._itemsOrientadorEquipe());
       Modals._onOrientadorInput();
 
-      // Limpar campos do QRU
-      const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
-      set('posto-local',''); set('posto-obs',''); set('posto-qru-pessoas','1');
+      // Limpar d e e
+      const clr = id => { const el=$(id); if(el) el.value=''; };
+      clr('posto-local'); clr('posto-obs');
 
-      const titulo = $('modal-add-operacao-titulo');
-      const btn    = $('btn-confirmar-add-op');
-      if (titulo) titulo.textContent = `QRU PARA: ${esc(op.nome||'—')}`;
-      if (btn)    btn.textContent    = 'ADICIONAR QRU';
-
+      $('modal-add-operacao-titulo').textContent = `NOVO QRU — ${esc(op.nome||'—')}`;
+      $('btn-confirmar-add-op').textContent      = 'ADICIONAR QRU';
       Modals._open('modal-add-operacao');
     },
 
@@ -1918,24 +1893,22 @@ const NIT_EFETIVO = (() => {
       Modals._editOperacaoId    = null;
       Modals._modoQruEmOperacao = posto.operacaoId;
 
-      // Esconder contexto de operação na edição de QRU
-      const ctxSec  = $('op-contexto-section');
-      const tmplSec = $('op-template-section');
-      if (ctxSec)  ctxSec.style.display  = 'none';
-      if (tmplSec) tmplSec.style.display = 'none';
-      const qruSec = $('op-qru-section');
+      // Na edição: esconder contexto de operação, mostrar só os campos do QRU
+      const ctxSec = $('op-contexto-section'), qruSec = $('op-qru-section');
+      if (ctxSec) ctxSec.style.display = 'none';
       if (qruSec) qruSec.style.display = '';
+
+      // Na edição: mostrar tipo de ação (o supervisor pode precisar mudar CONTROLE → BLOQUEIO)
+      const taSec = $('tipo-acao-section');
+      if (taSec) taSec.classList.remove('hidden');
+      Modals._montarTipoAcao(posto.tipoAcao || 'CONTROLE');
 
       const set = (id, val) => { const el=$(id); if(el) el.value = val||''; };
       set('posto-operacao-id', posto.operacaoId);
-      set('posto-local',    posto.local);
-      set('posto-bairro',   posto.bairro  || op.bairro  || '');
-      set('posto-horario',  posto.horario || op.horario || '');
-      set('posto-obs',      posto.obs);
-      set('posto-qru-pessoas', posto.qruPessoas || 1);
-
-      // Tipo de ação — pré-seleciona o valor atual do posto
-      Modals._montarTipoAcao(posto.tipoAcao || 'CONTROLE');
+      set('posto-local',   posto.local);
+      set('posto-bairro',  posto.bairro  || op.bairro  || '');
+      set('posto-horario', posto.horario || op.horario || '');
+      set('posto-obs',     posto.obs);
 
       const valorAtual = posto.alocacao?.id
         ? `${posto.alocacao.tipo === 'equipe' || posto.alocacao.tipo === 'viatura' ? 'v' : 'a'}:${posto.alocacao.id}`
@@ -1944,11 +1917,8 @@ const NIT_EFETIVO = (() => {
         Modals._itemsOrientadorEquipe(), valorAtual);
       Modals._onOrientadorInput();
 
-      const titulo = $('modal-add-operacao-titulo');
-      const btn    = $('btn-confirmar-add-op');
-      if (titulo) titulo.textContent = `EDITAR QRU Nº ${posto.numero}`;
-      if (btn)    btn.textContent    = 'SALVAR ALTERAÇÕES';
-
+      $('modal-add-operacao-titulo').textContent = `EDITAR QRU Nº ${posto.numero}`;
+      $('btn-confirmar-add-op').textContent      = 'SALVAR ALTERAÇÕES';
       Modals._open('modal-add-operacao');
     },
 
@@ -1959,13 +1929,10 @@ const NIT_EFETIVO = (() => {
       Modals._editPostoId       = null;
       Modals._modoQruEmOperacao = null;
 
-      // Mostrar só o contexto de operação, não o QRU
-      const ctxSec  = $('op-contexto-section');
-      const tmplSec = $('op-template-section');
-      const qruSec  = $('op-qru-section');
-      if (ctxSec)  ctxSec.style.display  = '';
-      if (tmplSec) tmplSec.style.display = 'none';
-      if (qruSec)  qruSec.style.display  = 'none';
+      // Mostrar só o contexto de operação, sem QRU
+      const ctxSec = $('op-contexto-section'), qruSec = $('op-qru-section');
+      if (ctxSec) ctxSec.style.display = '';
+      if (qruSec) qruSec.style.display = 'none';
 
       // Bairro
       Modals._montarBairroCombo();
@@ -1994,6 +1961,9 @@ const NIT_EFETIVO = (() => {
     },
 
     fecharAddOperacao() {
+      // Garantir que tipo-acao-section volta oculto para a próxima abertura
+      const taSec = $('tipo-acao-section');
+      if (taSec) taSec.classList.add('hidden');
       Modals._editOperacaoId    = null;
       Modals._editPostoId       = null;
       Modals._modoQruEmOperacao = null;
@@ -2002,22 +1972,14 @@ const NIT_EFETIVO = (() => {
     fecharAddPosto() { Modals.fecharAddOperacao(); }, // alias retrocompat.
 
     // Lista de orientadores (ex-recursos) + equipes (ex-viaturas).
-    // Nome humanizado: "Orientador/Equipe" em vez de "Agente/Viatura".
     _itemsOrientadorEquipe() {
       const agentes = recursosOrdenados(([,r]) => r.status !== 'desligado')
-        .map(([id,r]) => ({
-          value: `a:${id}`,
-          label: `${r.nome} · ${r.cargo||'—'}`
-        }));
+        .map(([id,r]) => ({ value:`a:${id}`, label:`${r.nome} · ${r.cargo||'—'}` }));
       const equipes = sortByNome(Object.entries(S.viaturas))
-        .map(([id,v]) => ({
-          value: `v:${id}`,
-          label: `👥 ${v.nome||id}${v.temViatura?' 🚓':''}`
-        }));
+        .map(([id,v]) => ({ value:`v:${id}`, label:`👥 ${v.nome||id}${v.temViatura?' 🚓':''}` }));
       return [...agentes, ...equipes];
     },
-    // Alias para retrocompat com refs no HTML gerado
-    _itemsRecursoViatura() { return Modals._itemsOrientadorEquipe(); },
+    _itemsRecursoViatura() { return Modals._itemsOrientadorEquipe(); }, // alias retrocompat.
 
     async confirmarAddOperacao() {
       // ── MODO EDITAR OPERAÇÃO ──────────────────────────────
@@ -2035,23 +1997,14 @@ const NIT_EFETIVO = (() => {
         return;
       }
 
-      // ── MODO TEMPLATE ─────────────────────────────────────
-      const templateId = $('op-template-select')?.value || '';
-      if (templateId) {
-        await DB.aplicarTemplate(templateId, S.escalaAtiva);
-        Modals.fecharAddOperacao();
-        UI.toast(`Template aplicado!`, 'success');
-        return;
-      }
+      // ── SALVAR QRU ────────────────────────────────────────
+      const local  = $('posto-local')?.value.trim();
+      // tipo de ação: lê do select se visível (edição), senão usa CONTROLE
+      const tipo   = $('posto-tipo-acao')?.value || 'CONTROLE';
+      const obs    = $('posto-obs')?.value.trim();
+      const recVal = Modals._resolverCombo('posto-recurso-input');
 
-      // ── SALVAR QRU (com ou sem nova operação) ─────────────
-      const local   = $('posto-local')?.value.trim();
-      const recVal  = Modals._resolverCombo('posto-recurso-input');
-      const tipo    = $('posto-tipo-acao')?.value;
-      const obs     = $('posto-obs')?.value.trim();
-      const qruP    = parseInt($('posto-qru-pessoas')?.value)||1;
-
-      // Alocação — opcional agora (orientador pode ser designado depois)
+      // Alocação — opcional (pode ser designada depois)
       let alocacao = null;
       if (recVal) {
         if (recVal.startsWith('v:')) {
@@ -2070,8 +2023,8 @@ const NIT_EFETIVO = (() => {
         const bairro     = Modals._resolverCombo('op-bairro-input') || $('op-bairro-input')?.value?.trim();
         const hor        = $('op-horario')?.value;
         const tipoMissao = $('op-tipo-missao')?.value;
-        const nomeEl     = $('op-nome');
-        const nome       = nomeEl?.value.trim() || (tipoMissao && bairro ? `${tipoMissao} — ${bairro}` : tipoMissao||bairro||'OPERAÇÃO');
+        const nome       = $('op-nome')?.value?.trim() ||
+          (tipoMissao && bairro ? `${tipoMissao} — ${bairro}` : tipoMissao||bairro||'OPERAÇÃO');
         if (!bairro)     { UI.toast('Bairro é obrigatório','warning'); return; }
         if (!tipoMissao) { UI.toast('Selecione o tipo de missão','warning'); return; }
         opId = await DB.adicionarOperacao(S.escalaAtiva, {
@@ -2079,16 +2032,15 @@ const NIT_EFETIVO = (() => {
         });
       }
 
-      // Adicionar posto (orientador é opcional — sinalizado visualmente se ausente)
       const op = S.operacoes[opId] || {};
       const dadosPosto = {
-        local:    upper(local||''),
-        bairro:   upper(($('posto-bairro')?.value||op.bairro||'')),
-        horario:  $('posto-horario')?.value || op.horario || '',
-        tipoAcao: tipo,
+        local:     upper(local||''),
+        bairro:    upper($('posto-bairro')?.value || op.bairro || ''),
+        horario:   $('posto-horario')?.value || op.horario || '',
+        tipoAcao:  tipo,
         alocacao,
-        obs:      upper(obs),
-        qruPessoas: qruP
+        obs:       upper(obs),
+        qruPessoas: 1   // padrão fixo — campo removido do formulário primário
       };
 
       if (Modals._editPostoId) {
@@ -2177,38 +2129,6 @@ const NIT_EFETIVO = (() => {
     },
 
     // ── NOVA OPERAÇÃO ────────────────────────────────────────
-    _editOperacaoId: null, // null = criação; string = edição
-
-    abrirAddOperacao() {
-      if (!S.escalaAtiva) { UI.toast('Abra um turno primeiro','warning'); return; }
-      Modals._editOperacaoId = null;
-      // Mostrar ou ocultar selector de templates
-      const tmplSection = $('op-template-section');
-      const tmplSel     = $('op-template-select');
-      const templates   = Object.entries(S.templates);
-      if (tmplSection && tmplSel) {
-        if (templates.length) {
-          tmplSection.style.display = '';
-          tmplSel.innerHTML =
-            `<option value="">— Sem template (operação manual) —</option>` +
-            templates
-              .sort(([,a],[,b]) => (a.nome||'').localeCompare(b.nome||'','pt-BR'))
-              .map(([id,t]) => `<option value="${id}">${esc(t.nome)}${t.bairro?' · '+upper(t.bairro):''}</option>`)
-              .join('');
-        } else {
-          tmplSection.style.display = 'none';
-        }
-      }
-      const tipoSel = $('op-tipo-missao');
-      if (tipoSel) tipoSel.innerHTML = `<option value="">— Selecionar —</option>` +
-        CFG.TIPOS_MISSAO.map(t => `<option>${t}</option>`).join('');
-      const h3  = document.querySelector('#modal-add-operacao .modal-header h3');
-      const btn = document.querySelector('#modal-add-operacao .btn-primary');
-      if (h3)  h3.textContent  = 'NOVA OPERAÇÃO';
-      if (btn) btn.textContent = 'ADICIONAR';
-      Modals._open('modal-add-operacao');
-    },
-
     // ── SUPERVISÃO ───────────────────────────────────────────
     _editSupervisao: null, // { camada, recursoId } | null
 
