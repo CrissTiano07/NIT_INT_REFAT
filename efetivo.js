@@ -1538,30 +1538,44 @@ const NIT_EFETIVO = (() => {
         let corpo = '';
 
         if (funcaoSup) {
+          // Pessoa na supervisão — não tem posto de campo, tem função de apoio
           corpo = `<div class="campo-qth-destaque">
-            <div class="campo-qth-label">FUNÇÃO NO TURNO</div>
-            <div class="campo-qth-valor">${upper(funcaoSup.camada)}</div>
-            <div class="campo-qth-bairro">SUPERVISÃO / APOIO NA CENTRAL</div>
-            ${funcaoSup.contato
-              ? `<a href="tel:${esc(funcaoSup.contato)}" class="campo-tel">📞 ${esc(funcaoSup.contato)}</a>` : ''}
+            <div class="campo-zona-onde">
+              <div class="campo-zona-onde-label">QTH · ONDE</div>
+              <div class="campo-qth-valor">CENTRAL DE OPERAÇÕES</div>
+              <div class="campo-qth-bairro">SUPERVISÃO / APOIO NA CENTRAL</div>
+              ${funcaoSup.contato
+                ? `<a href="tel:${esc(funcaoSup.contato)}" class="btn-maps">📞 ${esc(funcaoSup.contato)}</a>` : ''}
+            </div>
+            <div class="campo-zona-oque">
+              <div class="campo-qtu-num">FUNÇÃO NO TURNO</div>
+              <div class="campo-acao-badge">${upper(funcaoSup.camada)}</div>
+            </div>
           </div>`;
         } else if (postos.length) {
           corpo = postos.map(p => {
             const op  = operacoes[p.operacaoId] || {};
             const url = `https://maps.google.com/maps?q=${encodeURIComponent((p.local||'') + ', Fortaleza, CE')}`;
             const horarioAlerta = operacaoForaDoPadrao(p, escala);
+            // ── QTH = ONDE / QRU = O QUÊ ─────────────────────────
+            // Duas zonas visuais distintas: o agente no sol encontra
+            // o endereço (QTH) imediatamente, sem ler o card inteiro.
             return `<div class="campo-qth-destaque">
-              <div class="campo-qtu-num">QRU Nº ${p.numero}</div>
-              <div class="campo-qth-label">QTH</div>
-              <div class="campo-qth-valor">${esc(p.local||'—')}</div>
-              <div class="campo-qth-bairro">${esc(p.bairro||op.bairro||'')}</div>
-              <div class="campo-acao-badge">${esc(p.tipoAcao||'')}</div>
-              ${op.nome ? `<div class="campo-op-nome${horarioAlerta ? ' campo-op-nome-alerta' : ''}">
-                Operação: ${esc(op.nome)}${op.horario?` · ${horarioAlerta?'⚠ ':''}${op.horario}h`:''}
-              </div>` : ''}
-              ${horarioAlerta ? `<div class="campo-horario-alerta-nota">⚠ Fora do horário oficial do turno (${esc(escala?.horarioInicio)}–${esc(escala?.horarioFim)})</div>` : ''}
-              ${p.obs   ? `<div class="campo-obs">${esc(p.obs)}</div>` : ''}
-              <a href="${url}" target="_blank" rel="noopener" class="btn-maps">📍 Abrir no Maps</a>
+              <div class="campo-zona-onde">
+                <div class="campo-zona-onde-label">QTH · ONDE</div>
+                <div class="campo-qth-valor">${esc(p.local||'—')}</div>
+                <div class="campo-qth-bairro">${esc(p.bairro||op.bairro||'')}</div>
+                <a href="${url}" target="_blank" rel="noopener" class="btn-maps">📍 Abrir no Maps</a>
+              </div>
+              <div class="campo-zona-oque">
+                <div class="campo-qtu-num">QRU Nº ${p.numero} · O QUÊ</div>
+                <div class="campo-acao-badge">${esc(p.tipoAcao||'')}</div>
+                ${op.nome ? `<div class="campo-op-nome${horarioAlerta ? ' campo-op-nome-alerta' : ''}">
+                  ${esc(op.nome)}${op.horario ? ` · ${horarioAlerta ? '⚠ ' : ''}${op.horario}h` : ''}
+                </div>` : ''}
+                ${horarioAlerta ? `<div class="campo-horario-alerta-nota">⚠ Fora do horário oficial do turno (${esc(escala?.horarioInicio)}–${esc(escala?.horarioFim)})</div>` : ''}
+                ${p.obs ? `<div class="campo-obs">${esc(p.obs)}</div>` : ''}
+              </div>
             </div>`;
           }).join('');
         } else {
@@ -1583,7 +1597,7 @@ const NIT_EFETIVO = (() => {
               <a href="tel:${esc(supervisorInfo.contato)}" class="campo-tel">📞 ${esc(supervisorInfo.contato)}</a>
             </div>` : ''}
           <div class="campo-turno-info${escalaForaDoPadrao(escala) ? ' campo-turno-info-alerta' : ''}">
-            ${escala ? `${escalaForaDoPadrao(escala)?'⚠ ':''}TURNO ${esc(turnoLabel(escala))} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
+            ${escala ? `${escalaForaDoPadrao(escala) ? '⚠ ' : ''}TURNO ${esc(turnoLabel(escala))} · ${esc(escala.horarioInicio)}–${esc(escala.horarioFim)}` : 'TURNO A DEFINIR'}
           </div>
         </div>`;
       }
